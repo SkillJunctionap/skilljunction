@@ -2,36 +2,60 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { db, auth } from "@/lib/firebase";
-import { collection, getDocs, orderBy, query } from "firebase/firestore";
-import { onAuthStateChanged, User } from "firebase/auth";
+import { useRouter } from "next/navigation";
 
-interface Job {
+import { auth, db } from "@/lib/firebase";
+import { onAuthStateChanged, User } from "firebase/auth";
+import {
+  collection,
+  getDocs,
+  orderBy,
+  query,
+  Timestamp,
+} from "firebase/firestore";
+
+type Job = {
   id: string;
   title: string;
   description: string;
   budget: number;
-  createdAt?: any;
-  createdBy?: string;
-}
+  createdBy?: string | null;
+  createdAt?: Timestamp | null;
+};
 
 export default function JobsPage() {
-  const [jobs, setJobs] = useState<Job[]>([]);
-  const [loading, setLoading] = useState(true);
+  const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
+  const [checkingAuth, setCheckingAuth] = useState(true);
 
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [loadingJobs, setLoadingJobs] = useState(true);
+  const [error, setError] = useState("");
+
+  // Protect this page: only logged-in users can browse jobs
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (firebaseUser) => {
-      setUser(firebaseUser);
+      if (!firebaseUser) {
+        router.push("/login");
+      } else {
+        setUser(firebaseUser);
+      }
+      setCheckingAuth(false);
     });
-    return () => unsub();
-  }, []);
 
+    return () => unsub();
+  }, [router]);
+
+  // Load jobs from Firestore
   useEffect(() => {
     const fetchJobs = async () => {
       try {
-        const q = query(collection(db, "jobs"), orderBy("createdAt", "desc"));
+        const q = query(
+          collection(db, "jobs"),
+          orderBy("createdAt", "desc")
+        );
         const snap = await getDocs(q);
+
         const list: Job[] = [];
         snap.forEach((docSnap) => {
           const data = docSnap.data() as any;
@@ -40,39 +64,49 @@ export default function JobsPage() {
             title: data.title || "Untitled job",
             description: data.description || "",
             budget: data.budget || 0,
-            createdAt: data.createdAt,
-            createdBy: data.createdBy || "",
+            createdBy: data.createdBy ?? null,
+            createdAt: (data.createdAt as Timestamp) ?? null,
           });
         });
+
         setJobs(list);
-      } catch (err) {
+      } catch (err: any) {
         console.error(err);
+        setError("Could not load jobs right now.");
       } finally {
-        setLoading(false);
+        setLoadingJobs(false);
       }
     };
 
     fetchJobs();
   }, []);
 
-  const formatDate = (ts: any) => {
+  const formatDate = (ts?: Timestamp | null) => {
     if (!ts) return "";
     try {
-      const d =
-        ts.toDate?.() ??
-        (ts.seconds ? new Date(ts.seconds * 1000) : new Date(ts));
+      const d = ts.toDate();
       return d.toLocaleDateString();
     } catch {
       return "";
     }
   };
 
+  if (checkingAuth) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <p className="text-sm text-slate-500">Checking your session…</p>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-50">
       <div className="max-w-6xl mx-auto px-4 py-10">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Browse Jobs</h1>
+            <h1 className="text-2xl font-bold text-slate-900">
+              Browse Jobs
+            </h1>
             {user && (
               <p className="text-sm text-slate-600 mt-1">
                 Logged in as {user.email}
@@ -95,8 +129,14 @@ export default function JobsPage() {
           </div>
         </div>
 
-        {loading ? (
-          <p className="text-sm text-slate-500">Loading jobs...</p>
+        {error && (
+          <p className="mb-3 text-sm text-rose-600">
+            {error}
+          </p>
+        )}
+
+        {loadingJobs ? (
+          <p className="text-sm text-slate-500">Loading jobs…</p>
         ) : jobs.length === 0 ? (
           <p className="text-sm text-slate-500">
             No jobs posted yet. Be the first to{" "}
@@ -123,13 +163,11 @@ export default function JobsPage() {
                   <div className="flex items-center justify-between text-sm text-slate-600">
                     <span>
                       Budget:{" "}
-                      <span className="font-semibold">
-                        ${job.budget.toString()}
-                      </span>
+                      <span className="font-semibold">${job.budget}</span>
                     </span>
                     <span className="text-xs text-slate-500">
-                      Posted by {job.createdBy || "client"}{" "}
-                      {job.createdAt && "• " + formatDate(job.createdAt)}
+                      Posted by {job.createdBy || "client"}
+                      {job.createdAt && " • " + formatDate(job.createdAt)}
                     </span>
                   </div>
                 </div>
@@ -141,4 +179,5 @@ export default function JobsPage() {
     </div>
   );
 }
+
 
