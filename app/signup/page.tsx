@@ -1,118 +1,128 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { auth, db } from "@/lib/firebase";
-import { onAuthStateChanged, signOut, User } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
+import { createUserWithEmailAndPassword } from "firebase/auth";
+import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 
-export default function DashboardPage() {
+export default function SignupPage() {
   const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
-  const [checking, setChecking] = useState(true);
-  const [role, setRole] = useState<string | null>(null);
-  const [loadingRole, setLoadingRole] = useState(true);
 
-  useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (!firebaseUser) {
-        setUser(null);
-        setRole(null);
-        setChecking(false);
-        setLoadingRole(false);
-        router.push("/login");
-        return;
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [role, setRole] = useState("freelancer");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleSignup = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setLoading(true);
+    setError("");
+
+    try {
+      const userCred = await createUserWithEmailAndPassword(
+        auth,
+        email,
+        password
+      );
+
+      const user = userCred.user;
+
+      await setDoc(doc(db, "users", user.uid), {
+        email,
+        role,
+        createdAt: serverTimestamp(),
+      });
+
+      router.replace("/dashboard");
+    } catch (err: any) {
+      console.error(err);
+
+      if (err?.code === "auth/email-already-in-use") {
+        setError("That email is already in use. Try logging in instead.");
+      } else if (err?.code === "auth/weak-password") {
+        setError("Password should be at least 6 characters.");
+      } else if (err?.code === "auth/invalid-email") {
+        setError("Please enter a valid email address.");
+      } else {
+        setError(err?.message || "Could not create account.");
       }
-
-      setUser(firebaseUser);
-
-      try {
-        const snap = await getDoc(doc(db, "users", firebaseUser.uid));
-        if (snap.exists()) {
-          const data = snap.data() as any;
-          setRole(data.role ?? null);
-        } else {
-          setRole(null);
-        }
-      } catch (err) {
-        console.error(err);
-        setRole(null);
-      } finally {
-        setChecking(false);
-        setLoadingRole(false);
-      }
-    });
-
-    return () => unsub();
-  }, [router]);
-
-  if (checking) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p>Checking your session...</p>
-      </div>
-    );
-  }
-
-  if (!user) return null;
-
-  const handleLogout = async () => {
-    await signOut(auth);
-    router.push("/login");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center">
-      <div className="bg-white shadow-md rounded-xl p-6 max-w-md w-full">
-        <h1 className="text-2xl font-bold mb-2">
-          Welcome to Skill Junction,
+    <div className="min-h-screen flex items-center justify-center bg-slate-50">
+      <div className="bg-white p-6 rounded-xl shadow-md w-full max-w-md">
+        <h1 className="text-2xl font-bold mb-4 text-gray-900">
+          Create account
         </h1>
-        <p className="text-sm text-gray-700 mb-2">{user.email}</p>
 
-        {loadingRole ? (
-          <p className="text-sm text-gray-500 mb-4">
-            Loading your account type...
-          </p>
-        ) : role ? (
-          <p className="text-sm text-gray-600 mb-4">
-            Account type:{" "}
-            <span className="font-semibold capitalize">
-              {role}
-            </span>
-          </p>
-        ) : (
-          <p className="text-sm text-gray-600 mb-4">
-            Account type: <span className="italic">not set</span>
-          </p>
-        )}
+        <form onSubmit={handleSignup} className="space-y-3">
+          <div>
+            <label className="block mb-1 text-sm font-medium text-gray-700">
+              Email
+            </label>
+            <input
+              type="email"
+              placeholder="Email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              className="w-full border border-gray-300 p-2 rounded text-gray-900 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-sky-500"
+            />
+          </div>
 
-        <p className="text-sm text-gray-600 mb-4">
-          Use the navigation below to get started.
-        </p>
+          <div>
+            <label className="block mb-1 text-sm font-medium text-gray-700">
+              Password
+            </label>
+            <input
+              type="password"
+              placeholder="Password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              className="w-full border border-gray-300 p-2 rounded text-gray-900 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-sky-500"
+            />
+          </div>
 
-        <div className="flex flex-wrap gap-2 mb-4">
-          <button
-            onClick={() => router.push("/jobs")}
-            className="px-4 py-2 rounded-lg bg-sky-600 text-white text-sm font-semibold hover:bg-sky-700"
-          >
-            Browse Jobs
-          </button>
-          {role === "client" && (
-            <button
-              onClick={() => router.push("/post-job")}
-              className="px-4 py-2 rounded-lg border border-sky-600 text-sky-700 text-sm font-semibold hover:bg-sky-50"
+          <div>
+            <label className="block mb-1 text-sm font-medium text-gray-700">
+              Account type
+            </label>
+            <select
+              value={role}
+              onChange={(e) => setRole(e.target.value)}
+              className="w-full border border-gray-300 p-2 rounded text-gray-900 focus:outline-none focus:ring-2 focus:ring-sky-500"
             >
-              Post a Job
-            </button>
-          )}
-        </div>
+              <option value="freelancer">Freelancer</option>
+              <option value="client">Client</option>
+            </select>
+          </div>
 
-        <button
-          onClick={handleLogout}
-          className="mt-2 px-4 py-2 rounded-lg bg-rose-500 text-white text-sm font-semibold hover:bg-rose-600"
-        >
-          Log out
-        </button>
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full bg-sky-600 text-white p-2 rounded hover:bg-sky-700 disabled:opacity-60"
+          >
+            {loading ? "Creating..." : "Create Account"}
+          </button>
+
+          {error && <p className="text-red-500 text-sm">{error}</p>}
+        </form>
+
+        <p className="text-sm mt-3 text-gray-600">
+          Already have account?
+          <span
+            onClick={() => router.push("/login")}
+            className="text-sky-600 cursor-pointer ml-1 hover:underline"
+          >
+            Login
+          </span>
+        </p>
       </div>
     </div>
   );
