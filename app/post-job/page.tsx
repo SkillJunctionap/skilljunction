@@ -57,13 +57,13 @@ export default function PostJobPage() {
 
     try {
       await addDoc(collection(db, "jobs"), {
-        title: title.trim(),
-        description: description.trim(),
-        budget: numericBudget,
-        createdBy: user.email ?? null,
-        createdByUid: user.uid,
-        createdAt: serverTimestamp(),
-      });
+  title: title.trim(),
+  description: description.trim(),
+  budget: numericBudget,
+  createdBy: user.uid,
+  clientEmail: user.email ?? null,
+  createdAt: serverTimestamp(),
+});
 
       // After successful post, go to Browse Jobs
       router.push("/jobs");
