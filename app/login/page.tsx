@@ -41,52 +41,39 @@ setForm(prev=>({
 
 
 
-const handleSubmit = async(e:FormEvent<HTMLFormElement>)=>{
+const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
+  e.preventDefault();
+  setError("");
+  setLoading(true);
 
-e.preventDefault();
+  try {
+    const userCred = await signInWithEmailAndPassword(
+      auth,
+      form.email,
+      form.password
+    );
 
-setError("");
+    const user = userCred.user;
 
-setLoading(true);
+    const snap = await getDoc(doc(db, "users", user.uid));
 
-try{
+    if (snap.exists()) {
+      const data = snap.data() as any;
 
-const userCred = await signInWithEmailAndPassword(
+      if (data.role === "client") {
+        router.push("/client-dashboard");
+      } else {
+        router.push("/dashboard");
+      }
+    } else {
+      router.push("/dashboard");
+    }
+  } catch (err) {
+    console.error(err);
+    setError("Invalid email or password");
+  }
 
-auth,
-
-form.email,
-
-form.password
-
-);
-
-const user = userCred.user;
-
-
-
-const snap = await getDoc(
-
-doc(db,"users",user.uid)
-
-);
-
-
-
-router.push("/dashboard");
-
-
-
-}catch(err){
-
-console.error(err);
-
-setError("Invalid email or password");
-
-}
-
-setLoading(false);
-
+  setLoading(false);
 };
 
 

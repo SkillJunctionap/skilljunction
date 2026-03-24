@@ -35,7 +35,11 @@ export default function SignupPage() {
         createdAt: serverTimestamp(),
       });
 
-      router.replace("/dashboard");
+      if (role === "client") {
+  router.replace("/client-dashboard");
+} else {
+  router.replace("/dashboard");
+}
     } catch (err: any) {
       console.error(err);
 
