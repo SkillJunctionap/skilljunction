@@ -31,7 +31,8 @@ export default function JobPage() {
   const [loading, setLoading] = useState(true);
 
   const [user, setUser] = useState<User | null>(null);
-  const [authChecked, setAuthChecked] = useState(false);
+const [userRole, setUserRole] = useState<string | null>(null);
+const [authChecked, setAuthChecked] = useState(false);
 
   const [offerBudget, setOfferBudget] = useState("");
   const [timeline, setTimeline] = useState("");
@@ -40,13 +41,35 @@ export default function JobPage() {
   const [message, setMessage] = useState("");
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (firebaseUser) => {
-      setUser(firebaseUser);
+  const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
+    if (!firebaseUser) {
+      setUser(null);
+      setUserRole(null);
       setAuthChecked(true);
-    });
+      return;
+    }
 
-    return () => unsub();
-  }, []);
+    setUser(firebaseUser);
+
+    try {
+      const snap = await getDoc(doc(db, "users", firebaseUser.uid));
+
+      if (snap.exists()) {
+        const data = snap.data() as any;
+        setUserRole(data.role ?? null);
+      } else {
+        setUserRole(null);
+      }
+    } catch (err) {
+      console.error(err);
+      setUserRole(null);
+    }
+
+    setAuthChecked(true);
+  });
+
+  return () => unsub();
+}, []);
 
   useEffect(() => {
     const id = params?.id;
@@ -98,7 +121,10 @@ export default function JobPage() {
       setMessage("Job details are missing.");
       return;
     }
-
+if (userRole !== "freelancer") {
+  setMessage("Only freelancers can apply for jobs.");
+  return;
+}
     if (isOwner) {
       setMessage("You cannot apply to your own job.");
       return;
@@ -216,11 +242,15 @@ export default function JobPage() {
                 </button>
               </div>
             ) : isOwner ? (
-              <p className="text-sm text-slate-600">
-                You posted this job, so the apply form is hidden.
-              </p>
-            ) : (
-              <form onSubmit={handleApply} className="space-y-4">
+  <p className="text-sm text-slate-600">
+    You posted this job, so the apply form is hidden.
+  </p>
+) : userRole !== "freelancer" ? (
+  <p className="text-sm text-slate-600">
+    Only freelancers can apply for jobs.
+  </p>
+) : (
+  <form onSubmit={handleApply} className="space-y-4">
                 <div>
                   <label className="block mb-1 text-sm font-medium text-gray-700">
                     Your offer amount
