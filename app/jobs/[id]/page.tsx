@@ -2,7 +2,13 @@
 
 import { useEffect, useState, FormEvent } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { doc, getDoc, collection, addDoc, serverTimestamp } from "firebase/firestore";
+import {
+  doc,
+  getDoc,
+  collection,
+  addDoc,
+  serverTimestamp,
+} from "firebase/firestore";
 import { onAuthStateChanged, User } from "firebase/auth";
 import { db, auth } from "@/lib/firebase";
 
@@ -12,7 +18,8 @@ interface Job {
   category?: string;
   budget?: number;
   clientEmail?: string;
-  createdBy?: string;
+  createdBy?: string | null;
+  createdByUid?: string | null;
 }
 
 export default function JobPage() {
@@ -72,6 +79,13 @@ export default function JobPage() {
     fetchJob();
   }, [params]);
 
+  const isOwner =
+    !!user &&
+    !!job &&
+    (job.createdBy === user.uid ||
+      job.createdByUid === user.uid ||
+      job.clientEmail === user.email);
+
   const handleApply = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
@@ -82,6 +96,11 @@ export default function JobPage() {
 
     if (!job || !jobId) {
       setMessage("Job details are missing.");
+      return;
+    }
+
+    if (isOwner) {
+      setMessage("You cannot apply to your own job.");
       return;
     }
 
@@ -162,6 +181,12 @@ export default function JobPage() {
             </p>
           )}
 
+          {!job.clientEmail && (
+            <p className="text-sm text-slate-600 mb-4">
+              <span className="font-medium">Client:</span> Unknown
+            </p>
+          )}
+
           <div className="mb-8">
             <h2 className="text-sm font-semibold text-slate-900 mb-2">
               Job description
@@ -173,7 +198,7 @@ export default function JobPage() {
 
           <div className="border-t border-slate-200 pt-6">
             <h2 className="text-lg font-semibold text-slate-900 mb-4">
-              Apply for this job
+              {isOwner ? "Your job posting" : "Apply for this job"}
             </h2>
 
             {!authChecked ? (
@@ -190,6 +215,10 @@ export default function JobPage() {
                   Go to login
                 </button>
               </div>
+            ) : isOwner ? (
+              <p className="text-sm text-slate-600">
+                You posted this job, so the apply form is hidden.
+              </p>
             ) : (
               <form onSubmit={handleApply} className="space-y-4">
                 <div>

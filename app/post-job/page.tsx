@@ -61,6 +61,7 @@ export default function PostJobPage() {
   description: description.trim(),
   budget: numericBudget,
   createdBy: user.uid,
+  createdByUid: user.uid,
   clientEmail: user.email ?? null,
   createdAt: serverTimestamp(),
 });

@@ -6,13 +6,15 @@ import { onAuthStateChanged, User } from "firebase/auth";
 import {
   collection,
   getDocs,
-  query,
-  where,
+  Timestamp,
 } from "firebase/firestore";
 
 interface Job {
   id: string;
   title: string;
+  createdBy?: string | null;
+  createdByUid?: string | null;
+  clientEmail?: string | null;
 }
 
 interface Application {
@@ -23,135 +25,124 @@ interface Application {
   timeline: string;
   proposal: string;
   status: string;
+  createdAt?: Timestamp | null;
 }
 
 export default function ClientDashboard() {
+  const [user, setUser] = useState<User | null>(null);
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [applications, setApplications] = useState<Application[]>([]);
+  const [loading, setLoading] = useState(true);
 
-const [user,setUser] = useState<User | null>(null);
-const [jobs,setJobs] = useState<Job[]>([]);
-const [applications,setApplications] = useState<Application[]>([]);
-const [loading,setLoading] = useState(true);
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (!firebaseUser) {
+        setUser(null);
+        setLoading(false);
+        return;
+      }
 
-useEffect(()=>{
+      setUser(firebaseUser);
 
-const unsub = onAuthStateChanged(auth,async(firebaseUser)=>{
+      try {
+        const jobsSnap = await getDocs(collection(db, "jobs"));
+        const allJobs: Job[] = [];
 
-if(!firebaseUser){
-setUser(null);
-setLoading(false);
-return;
-}
+        jobsSnap.forEach((docSnap) => {
+          const data = docSnap.data() as any;
+          allJobs.push({
+            id: docSnap.id,
+            title: data.title ?? "Untitled job",
+            createdBy: data.createdBy ?? null,
+            createdByUid: data.createdByUid ?? null,
+            clientEmail: data.clientEmail ?? null,
+          });
+        });
 
-setUser(firebaseUser);
+        const myJobs = allJobs.filter((job) => {
+          return (
+            job.createdBy === firebaseUser.uid ||
+            job.createdByUid === firebaseUser.uid ||
+            job.clientEmail === firebaseUser.email
+          );
+        });
 
-try{
+        setJobs(myJobs);
 
-// Get jobs posted by this user
-const jobsSnap = await getDocs(
-query(collection(db,"jobs"),where("createdBy","==",firebaseUser.uid))
-);
+        const appsSnap = await getDocs(collection(db, "applications"));
+        const allApps: Application[] = [];
 
-const jobsList:Job[] = [];
+        appsSnap.forEach((docSnap) => {
+          const data = docSnap.data() as any;
+          allApps.push({
+            id: docSnap.id,
+            jobId: data.jobId ?? "",
+            applicantEmail: data.applicantEmail ?? "",
+            offerBudget:
+              typeof data.offerBudget === "number" ? data.offerBudget : 0,
+            timeline: data.timeline ?? "",
+            proposal: data.proposal ?? "",
+            status: data.status ?? "pending",
+            createdAt: (data.createdAt as Timestamp) ?? null,
+          });
+        });
 
-jobsSnap.forEach(doc=>{
-jobsList.push({
-id:doc.id,
-title:doc.data().title
-});
-});
+        setApplications(allApps);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    });
 
-setJobs(jobsList);
+    return () => unsub();
+  }, []);
 
-// Get applications
-const appsSnap = await getDocs(collection(db,"applications"));
+  if (loading) {
+    return <div className="p-6">Loading dashboard...</div>;
+  }
 
-const appsList:Application[] = [];
+  return (
+    <div className="min-h-screen bg-slate-50 p-6">
+      <h1 className="text-2xl font-bold mb-6">Client Dashboard</h1>
 
-appsSnap.forEach(doc=>{
-appsList.push({
-id:doc.id,
-...doc.data()
-} as Application);
-});
+      {jobs.length === 0 ? (
+        <p>No jobs posted yet.</p>
+      ) : (
+        jobs.map((job) => {
+          const jobApps = applications.filter((app) => app.jobId === job.id);
 
-setApplications(appsList);
+          return (
+            <div key={job.id} className="bg-white p-4 mb-4 rounded shadow">
+              <h2 className="text-lg font-semibold mb-2">{job.title}</h2>
 
-}catch(err){
-console.error(err);
-}
-
-setLoading(false);
-
-});
-
-return ()=>unsub();
-
-},[]);
-
-if(loading){
-return <div className="p-6">Loading dashboard...</div>;
-}
-
-return(
-
-<div className="min-h-screen bg-slate-50 p-6">
-
-<h1 className="text-2xl font-bold mb-6">
-Client Dashboard
-</h1>
-
-{jobs.length === 0 ? (
-<p>No jobs posted yet.</p>
-) : (
-
-jobs.map(job=>{
-
-const jobApps = applications.filter(app=>app.jobId === job.id);
-
-return(
-
-<div key={job.id} className="bg-white p-4 mb-4 rounded shadow">
-
-<h2 className="text-lg font-semibold mb-2">
-{job.title}
-</h2>
-
-{jobApps.length === 0 ? (
-
-<p className="text-sm text-gray-500">
-No applications yet.
-</p>
-
-) : (
-
-jobApps.map(app=>(
-<div key={app.id} className="border p-3 mb-2 rounded">
-
-<p><strong>Freelancer:</strong> {app.applicantEmail}</p>
-
-<p><strong>Offer:</strong> ${app.offerBudget}</p>
-
-<p><strong>Timeline:</strong> {app.timeline}</p>
-
-<p><strong>Proposal:</strong> {app.proposal}</p>
-
-<p><strong>Status:</strong> {app.status}</p>
-
-</div>
-))
-
-)}
-
-</div>
-
-);
-
-})
-
-)}
-
-</div>
-
-);
-
+              {jobApps.length === 0 ? (
+                <p className="text-sm text-gray-500">No applications yet.</p>
+              ) : (
+                jobApps.map((app) => (
+                  <div key={app.id} className="border p-3 mb-2 rounded">
+                    <p>
+                      <strong>Freelancer:</strong> {app.applicantEmail}
+                    </p>
+                    <p>
+                      <strong>Offer:</strong> ${app.offerBudget}
+                    </p>
+                    <p>
+                      <strong>Timeline:</strong> {app.timeline}
+                    </p>
+                    <p>
+                      <strong>Proposal:</strong> {app.proposal}
+                    </p>
+                    <p>
+                      <strong>Status:</strong> {app.status}
+                    </p>
+                  </div>
+                ))
+              )}
+            </div>
+          );
+        })
+      )}
+    </div>
+  );
 }
