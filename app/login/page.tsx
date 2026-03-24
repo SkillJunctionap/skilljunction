@@ -60,14 +60,17 @@ const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     if (snap.exists()) {
       const data = snap.data() as any;
 
+      // 🔥 IMPORTANT: force correct redirect
       if (data.role === "client") {
-        router.push("/client-dashboard");
+        window.location.href = "/client-dashboard";
+        return;
       } else {
-        router.push("/dashboard");
+        window.location.href = "/dashboard";
+        return;
       }
-    } else {
-      router.push("/dashboard");
     }
+
+    window.location.href = "/dashboard";
   } catch (err) {
     console.error(err);
     setError("Invalid email or password");
