@@ -3,11 +3,7 @@
 import { useEffect, useState } from "react";
 import { auth, db } from "@/lib/firebase";
 import { onAuthStateChanged, User } from "firebase/auth";
-import {
-  collection,
-  getDocs,
-  Timestamp,
-} from "firebase/firestore";
+import { collection, getDocs, Timestamp } from "firebase/firestore";
 
 interface Job {
   id: string;
@@ -28,7 +24,7 @@ interface Application {
   createdAt?: Timestamp | null;
 }
 
-export default function ClientDashboard() {
+export default function ClientDashboardPage() {
   const [user, setUser] = useState<User | null>(null);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [applications, setApplications] = useState<Application[]>([]);
@@ -99,7 +95,7 @@ export default function ClientDashboard() {
   }, []);
 
   if (loading) {
-    return <div className="p-6">Loading dashboard...</div>;
+    return <div className="p-6">Loading client dashboard...</div>;
   }
 
   return (
@@ -121,21 +117,11 @@ export default function ClientDashboard() {
               ) : (
                 jobApps.map((app) => (
                   <div key={app.id} className="border p-3 mb-2 rounded">
-                    <p>
-                      <strong>Freelancer:</strong> {app.applicantEmail}
-                    </p>
-                    <p>
-                      <strong>Offer:</strong> ${app.offerBudget}
-                    </p>
-                    <p>
-                      <strong>Timeline:</strong> {app.timeline}
-                    </p>
-                    <p>
-                      <strong>Proposal:</strong> {app.proposal}
-                    </p>
-                    <p>
-                      <strong>Status:</strong> {app.status}
-                    </p>
+                    <p><strong>Freelancer:</strong> {app.applicantEmail}</p>
+                    <p><strong>Offer:</strong> ${app.offerBudget}</p>
+                    <p><strong>Timeline:</strong> {app.timeline}</p>
+                    <p><strong>Proposal:</strong> {app.proposal}</p>
+                    <p><strong>Status:</strong> {app.status}</p>
                   </div>
                 ))
               )}
