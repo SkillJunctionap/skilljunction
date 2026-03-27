@@ -12,6 +12,8 @@ import {
   query,
   where,
   Timestamp,
+  getDoc,
+  doc,
 } from "firebase/firestore";
 
 type Application = {
@@ -38,27 +40,43 @@ export default function DashboardPage() {
 
 
 // Protect dashboard: only logged-in users
-useEffect(()=>{
+useEffect(() => {
+  const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
+    if (!firebaseUser) {
+      router.push("/login");
+      return;
+    }
 
-const unsub = onAuthStateChanged(auth,(firebaseUser)=>{
+    try {
+      const snap = await getDoc(doc(db, "users", firebaseUser.uid));
 
-if(firebaseUser){
+      if (snap.exists()) {
+        const data = snap.data() as any;
 
-setUser(firebaseUser);
+        if (data.role === "client") {
+          router.replace("/client-dashboard");
+          return;
+        }
 
-}else{
+        if (data.role === "freelancer") {
+          // stay here (this is freelancer dashboard)
+          setUser(firebaseUser);
+        } else {
+          setUser(firebaseUser);
+        }
+      } else {
+        setUser(firebaseUser);
+      }
+    } catch (err) {
+      console.error(err);
+      setUser(firebaseUser);
+    }
 
-router.push("/login");
+    setCheckingAuth(false);
+  });
 
-}
-
-setCheckingAuth(false);
-
-});
-
-return ()=>unsub();
-
-},[router]);
+  return () => unsub();
+}, [router]);
 
 
 
